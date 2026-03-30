@@ -5,6 +5,13 @@ import plotly.express as px
 import plotly.graph_objects as go
 from src.processing import AttendanceProcessor
 from src.model import AttendanceAnomalyDetector
+from src.visuals import (
+    plot_duration_distribution,
+    plot_login_vs_duration,
+    plot_anomalies_by_department,
+    plot_top_employees,
+    plot_anomaly_heatmap
+)
 
 # Page config
 st.set_page_config(
@@ -131,23 +138,13 @@ if uploaded_file:
                 # Plot 1: Work Duration Distribution
                 with c1:
                     st.subheader("Work Duration Distribution")
-                    fig1 = px.histogram(
-                        res_df, x="total_work_minutes", color="is_anomaly",
-                        nbins=30, barmode='overlay',
-                        labels={'is_anomaly': 'Anomaly', 'total_work_minutes': 'Minutes Worked'},
-                        color_discrete_map={0: '#636EFA', 1: '#EF553B'}
-                    )
+                    fig1 = plot_duration_distribution(res_df)
                     st.plotly_chart(fig1, use_container_width=True)
                 
                 # Plot 2: Login vs Duration Scatter
                 with c2:
                     st.subheader("Login vs Work Duration")
-                    fig2 = px.scatter(
-                        res_df, x="login_minutes", y="total_work_minutes", 
-                        color="is_anomaly",
-                        hover_data=['employee_id', 'date', 'department'],
-                        color_discrete_map={0: '#636EFA', 1: '#EF553B'}
-                    )
+                    fig2 = plot_login_vs_duration(res_df)
                     st.plotly_chart(fig2, use_container_width=True)
 
             with tab2:
@@ -170,31 +167,20 @@ if uploaded_file:
                 c1, c2 = st.columns(2)
                 
                 with c1:
-                    dept_anom = anomaly_df.groupby('department').size().reset_index(name='count')
-                    fig_dept = px.bar(dept_anom, x='department', y='count', title="Anomalies per Department")
+                    fig_dept = plot_anomalies_by_department(anomaly_df)
                     st.plotly_chart(fig_dept, use_container_width=True)
                     
                 with c2:
-                    emp_anom = anomaly_df.groupby('employee_id').size().reset_index(name='count').sort_values('count', ascending=False).head(10)
-                    fig_emp = px.bar(emp_anom, x='employee_id', y='count', title="Top 10 Employees with Flagged Logs")
+                    fig_emp = plot_top_employees(anomaly_df)
                     st.plotly_chart(fig_emp, use_container_width=True)
 
                 st.markdown("---")
                 st.subheader("🗓️ Anomaly Density Heatmap")
                 st.write("Understand which days of the week have the most irregular patterns per department.")
                 
-                # Cross-tabulate Day vs Department
-                heat_data = anomaly_df.groupby(['day_of_week', 'department']).size().reset_index(name='count')
-                days = {0:'Mon', 1:'Tue', 2:'Wed', 3:'Thu', 4:'Fri', 5:'Sat', 6:'Sun'}
-                heat_data['day_of_week'] = heat_data['day_of_week'].map(days)
-                
-                fig_heat = px.density_heatmap(
-                    heat_data, x="day_of_week", y="department", z="count",
-                    category_orders={"day_of_week": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]},
-                    color_continuous_scale='Viridis',
-                    title="Anomaly Concentration (Day vs Department)"
-                )
-                st.plotly_chart(fig_heat, use_container_width=True)
+                fig_heat = plot_anomaly_heatmap(anomaly_df)
+                if fig_heat:
+                    st.plotly_chart(fig_heat, use_container_width=True)
 
     except Exception as e:
         st.error(f"Error processing file: {e}")
